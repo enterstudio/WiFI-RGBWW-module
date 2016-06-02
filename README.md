@@ -44,6 +44,19 @@ Find the `compiler.c.elf.libs=...` line, and append to its end: ` -lpwm`
 Alternatively, you can remove the `#define ESPRESSIF_PWM 1` line in the sketch.
 However, this variant isn't well tested.
 
+# MQTT Topics
+
+All topics have the same format. Currently, they all begin with `/openHAB/Bedroom_ESP/` and have the individual channel following:
+
+ * `Reset` - publishing this will perform a reboot of the ESP
+ * `RGB` - semicolon-separated triple for the RGB channels with range 0..100, i.e. `100;100;100` for white
+ * `HSV` - comma-separated H,S,V values as used by OpenHAB (H: 0..360, S/V: 0..100)
+ * `Fader` - color cycling with varying speed, range 0..100. Will be turned off (and re-published) when HSV or RGB are written to
+ * `SW1` - W1 output, range 0..100
+ * `SW2` - W2 output, range 0..100
+ * `LED1` - green on-board LED, range 0..1
+ * `LED2` - red on-board LED, range 0..1
+
 
 # License
 
