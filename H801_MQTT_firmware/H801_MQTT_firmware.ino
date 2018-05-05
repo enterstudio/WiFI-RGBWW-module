@@ -224,12 +224,17 @@ void mqtt_event(const MQTT::Publish& pub) {
 	Serial1.println(pub.payload_string());
 
 	String payload = pub.payload_string();
+	int lash_slash = pub.topic().lastIndexOf('/');
+	if (lash_slash == -1)
+		return;
+	String topic_path = pub.topic().substring(0, lash_slash);
+	String topic_name = pub.topic().substring(lash_slash+1);
 
-	if(String(pub.topic()) == MQTT_PREFIX "Reset"){
+	if(topic_name == "Reset"){
 		Serial1.println("Resetting CPU!\n");
 		ESP.restart();
 	} else
-	if(String(pub.topic()) == MQTT_PREFIX "RGB"){
+	if(topic_name == "RGB"){
 		fader_speed = 0;
 		int c1 = payload.indexOf(';');
 		int c2 = payload.indexOf(';',c1+1);
@@ -239,7 +244,7 @@ void mqtt_event(const MQTT::Publish& pub) {
 		setLED100Target(bluePIN, payload.substring(c2+1));
 		client.publish(MQTT_PREFIX "Fader", "0");
 	}
-	if(String(pub.topic()) == MQTT_PREFIX "HSV"){
+	if(topic_name == "HSV"){
 		fader_speed = 0;
 		int c1 = payload.indexOf(',');
 		int c2 = payload.indexOf(',',c1+1);
@@ -248,19 +253,19 @@ void mqtt_event(const MQTT::Publish& pub) {
 		client.publish(MQTT_PREFIX "Fader", "0");
 
 	}
-	else if(String(pub.topic()) == MQTT_PREFIX "Fader"){
+	else if(topic_name == "Fader"){
 		fader_speed = payload.toInt();
 	}
-	else if(String(pub.topic()) == MQTT_PREFIX "SW1"){
+	else if(topic_name == "SW1"){
 		setLED100Target(w1PIN, payload);
 	}
-	else if(String(pub.topic()) == MQTT_PREFIX "SW2"){
+	else if(topic_name == "SW2"){
 		setLED100Target(w2PIN, payload);
 	}
-	else if(String(pub.topic()) == MQTT_PREFIX "LED1"){
+	else if(topic_name == "LED1"){
 		digitalWrite(LEDPIN, payload.toInt());
 	}
-	else if(String(pub.topic()) == MQTT_PREFIX "LED2"){
+	else if(topic_name == "LED2"){
 		digitalWrite(LED2PIN, payload.toInt());
 	}
 }
