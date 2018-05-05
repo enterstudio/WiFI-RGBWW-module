@@ -120,6 +120,9 @@ int fader_speed = 0;		//< speed of the color change effect
 int ledIs[PWM_CHANNELS];	//< current brightness for all channels
 int ledTarget[PWM_CHANNELS];	//< target brightness for all channels
 
+int reset_pin = 0;
+int taster_mode = 0;
+
 void updateLED(int pin, int delta) {
 	int val = ledIs[pin];
 	// do nothing if the value has been reached
@@ -279,6 +282,10 @@ void subscribe() {
 }
 
 void setup() {
+	// configure reset as input
+	pinMode(0, FUNCTION_0);
+	pinMode(0, INPUT_PULLUP);
+
 	// configure green and red LED pins
 	pinMode(LEDPIN, OUTPUT);
 	pinMode(LED2PIN, OUTPUT);
@@ -348,6 +355,19 @@ void loop() {
 		client.loop();
 	else
 		subscribe();
+
+	int rp = digitalRead(0);
+	if (rp != reset_pin) {
+		reset_pin = rp;
+		Serial1.printf("\nReset pin: %d\n", rp);
+		if (rp == 0) {
+			taster_mode = 255 - taster_mode;
+			Serial1.printf("\nSwitching light: %d\n", taster_mode);
+			setLEDTarget(redPIN, taster_mode);
+			setLEDTarget(greenPIN, taster_mode);
+			setLEDTarget(bluePIN, taster_mode);
+		}
+	}
 
 	unsigned long t = micros();
 	if (fader_speed > 0) {
