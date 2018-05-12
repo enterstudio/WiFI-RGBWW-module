@@ -9,6 +9,9 @@
 #include <ESP8266WiFi.h>
 #include <WiFiManager.h>
 
+#define WIFI_NETWORK "H801-Config"
+#define WIFI_PASSWORD "secret password"
+
 // CIE lookup table
 #include "cie1931.h"
 
@@ -341,7 +344,11 @@ void setup() {
 	LEDon;
 
 	// start WiFi registration
-	wifiManager.autoConnect("H801-Config", "secret password");
+	Serial1.println("Connecting to WiFi...");
+	wifiManager.setConfigPortalTimeout(180);
+	wifiManager.setAPCallback(wifiConfigCallback);
+	wifiManager.addParameter(&custom_mqtt_server);
+	wifiManager.autoConnect(WIFI_NETWORK, WIFI_PASSWORD);
 
 	while (WiFi.status() != WL_CONNECTED) {
 		LED2on;
@@ -363,6 +370,8 @@ void setup() {
 		ledIs[i] = 0;
 		ledTarget[i] = 0;
 	}
+	LEDoff;
+	LED2off;
 	last_tick = micros();
 }
 
