@@ -1,3 +1,5 @@
+#include <FS.h>
+
 // for HSV to RGB
 #include <RGBConverter.h>
 
@@ -11,6 +13,7 @@
 // for WiFi and config
 #include <ESP8266WiFi.h>
 #include <WiFiManager.h>
+#include <ArduinoJson.h>
 
 #define WIFI_NETWORK "H801-Config"
 #define WIFI_PASSWORD "secret password"
@@ -22,8 +25,6 @@
 
 // CIE lookup table
 #include "cie1931.h"
-
-String mqtt_prefix = "/openHAB/ZZZhostnameZZZ/";
 
 // debug output
 #if 0
@@ -119,15 +120,13 @@ uint32 io_info[][3] = {
 #define LED2off digitalWrite(LED2PIN,HIGH)
 #define LED2on digitalWrite(LED2PIN,LOW)
 
-// Update these with values suitable for your network.
-// TODO: replace with WifiManager option
-IPAddress server(192, 168, 0, 2);
+bool config_changed = false;
+String mqtt_server;
+String mqtt_prefix = "/openHAB/ZZZhostnameZZZ/";
 
-char mqtt_server[64];
-WiFiManagerParameter custom_mqtt_server("server", "MQTT Server (not working)", mqtt_server, 40);
 WiFiManager wifiManager;
 WiFiClient wclient;
-PubSubClient client(wclient, server);
+PubSubClient client(wclient);
 
 // OTA update
 ESP8266WebServer httpServer(80);
@@ -138,8 +137,13 @@ void wifiConfigCallback(WiFiManager *wifiManager) {
 	LEDon;
 	LED2on;
 	Serial1.println("WiFi configuration mode...");
-	Serial1.printf("Network: %s\r\nPassword: %s", WIFI_NETWORK, WIFI_PASSWORD);
+	Serial1.printf("Network: %s\r\nPassword: %s\r\n\r\n", WIFI_NETWORK, WIFI_PASSWORD);
 }
+void wifiSaveConfigCallback() {
+	Serial1.println("Configuration updated.");
+	config_changed = true;
+}
+
 
 int fader_speed = 0;		//< speed of the color change effect
 
@@ -262,6 +266,10 @@ void mqtt_event(const MQTT::Publish& pub) {
 		Serial1.println("Resetting CPU!\r\n");
 		ESP.restart();
 	} else
+	if(topic_name == "Config"){
+		Serial1.println("Starting configuration portal!\r\n");
+		wifiManager.startConfigPortal(WIFI_NETWORK, WIFI_PASSWORD);
+	} else
 	if(topic_name == "RGB"){
 		fader_speed = 0;
 		int c1 = payload.indexOf(';');
@@ -312,12 +320,60 @@ uint32 pwm_duty_init[PWM_CHANNELS] = { 0 };
 // perform (re)subscription to MQTT server
 void subscribe() {
 	LEDon;
+	client.set_server(mqtt_server);
 	if (client.connect(WiFi.hostname())) {
 		mqtt_prefix.replace("ZZZhostnameZZZ", WiFi.hostname());
 		client.subscribe(mqtt_prefix + "+");
-		Serial1.printf("MQTT connected: %s\r\n", mqtt_prefix.c_str());
+		Serial1.printf("MQTT connected to %s: %s\r\n", mqtt_server.c_str(), mqtt_prefix.c_str());
 		LEDoff;
 	}
+}
+
+void loadConfig() {
+	if (!SPIFFS.begin()) {
+		Serial1.println("No filesystem.");
+		return;
+	}
+	if (!SPIFFS.exists("/config.json")) {
+		Serial1.println("No config.json.");
+		return;
+	}
+	File config = SPIFFS.open("/config.json", "r");
+	if (!config) {
+		Serial1.println("Could not open config.json.");
+		return;
+	}
+	size_t size = config.size();
+	// Allocate a buffer to store contents of the file.
+	std::unique_ptr<char[]> buf(new char[size]);
+
+	config.readBytes(buf.get(), size);
+	DynamicJsonBuffer jsonBuffer;
+	JsonObject& json = jsonBuffer.parseObject(buf.get());
+	json.printTo(Serial1);
+	if (json.success()) {
+		mqtt_server = json["mqtt_server"].as<String>();
+	} else {
+		Serial1.println("Could not parse config.json.");
+	}
+}
+void saveConfigIfNeeded() {
+	if (!config_changed)
+		return;
+
+	Serial.println("Saving config.json...");
+	DynamicJsonBuffer jsonBuffer;
+	JsonObject& json = jsonBuffer.createObject();
+	json["mqtt_server"] = mqtt_server;
+
+	File config = SPIFFS.open("/config.json", "w");
+	if (!config) {
+		Serial1.println("failed to open config file for writing");
+		return;
+	}
+	json.printTo(Serial1);
+	json.printTo(config);
+	config.close();
 }
 
 void setup() {
@@ -369,6 +425,8 @@ void setup() {
 	analogWriteRange(cie_MAXVAL);
 #endif
 
+	loadConfig();
+
 	// register MQTT event listener
 	client.set_callback(mqtt_event);
 
@@ -378,16 +436,14 @@ void setup() {
 	Serial1.println("Connecting to WiFi...");
 	wifiManager.setConfigPortalTimeout(180);
 	wifiManager.setAPCallback(wifiConfigCallback);
-	wifiManager.addParameter(&custom_mqtt_server);
-	wifiManager.autoConnect(WIFI_NETWORK, WIFI_PASSWORD);
-
-	while (WiFi.status() != WL_CONNECTED) {
-		LED2on;
-		delay(250);
-		Serial1.print(".");
-		LED2off;
-		delay(250);
-	}
+	wifiManager.setSaveConfigCallback(wifiSaveConfigCallback);
+	WiFiManagerParameter mqtt_server_config("server", "MQTT Server", mqtt_server.c_str(), 40);
+	wifiManager.addParameter(&mqtt_server_config);
+	if (mqtt_server.length() > 0)
+		wifiManager.autoConnect(WIFI_NETWORK, WIFI_PASSWORD);
+	else
+		wifiManager.startConfigPortal(WIFI_NETWORK, WIFI_PASSWORD);
+	mqtt_server = mqtt_server_config.getValue();
 
 	Serial1.printf("\r\nWiFi connected: %s (%s)\r\n",
 		WiFi.hostname().c_str(),
@@ -398,6 +454,7 @@ void setup() {
 
 	subscribe();
 
+	saveConfigIfNeeded();
 
 	for (int i=0; i<PWM_CHANNELS; i++) {
 		ledIs[i] = 0;
