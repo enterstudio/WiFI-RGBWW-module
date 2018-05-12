@@ -263,10 +263,10 @@ void mqtt_event(const MQTT::Publish& pub) {
 		setLED100Target(w2PIN, payload);
 	}
 	else if(topic_name == "LED1"){
-		digitalWrite(LEDPIN, payload.toInt());
+		digitalWrite(LEDPIN, 1-payload.toInt());
 	}
 	else if(topic_name == "LED2"){
-		digitalWrite(LED2PIN, payload.toInt());
+		digitalWrite(LED2PIN, 1-payload.toInt());
 	}
 }
 
