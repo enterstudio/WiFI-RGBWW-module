@@ -343,7 +343,7 @@ void setup() {
 
 	// Setup console
 	Serial1.begin(115200);
-	delay(10);
+	while (!Serial1) /* busy loop for serial to attach */;
 	Serial1.printf("\nESP RGBWW (C) Andreas H, Georg L\n\n");
 
 #ifdef NEOPIXEL
@@ -362,6 +362,7 @@ void setup() {
 
 	pwm_start();
 #else
+	Serial1.println("Using flickering horrible Arduino PWM.");
 	analogWriteFreq(1000);
 	analogWriteRange(cie_MAXVAL);
 #endif
