@@ -106,10 +106,10 @@ uint32 io_info[][3] = {
 
 #endif // ESPRESSIF_PWM
 
-// onbaord green LED D1
-#define LEDPIN    5
-// onbaord red LED D2
-#define LED2PIN   1
+// onbaord green LED D1: used for MQTT connection status
+#define LEDPIN    1
+// onbaord red LED D2: used for WiFi status
+#define LED2PIN   5
 
 
 #define LEDoff digitalWrite(LEDPIN,HIGH)
@@ -295,10 +295,10 @@ void mqtt_event(const MQTT::Publish& pub) {
 		setLED100Target(w2PIN, payload);
 	}
 	else if(topic_name == "LED1"){
-		digitalWrite(LEDPIN, 1-payload.toInt());
+		digitalWrite(LEDPIN, 100-payload.toInt());
 	}
 	else if(topic_name == "LED2"){
-		digitalWrite(LED2PIN, 1-payload.toInt());
+		digitalWrite(LED2PIN, 100-payload.toInt());
 	}
 }
 
