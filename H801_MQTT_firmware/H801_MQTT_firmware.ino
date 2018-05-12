@@ -331,10 +331,15 @@ void setup() {
 	pinMode(12, OUTPUT);
 	pinMode(13, OUTPUT);
 	pinMode(15, OUTPUT);
+	digitalWrite(12, LOW);
+	digitalWrite(13, LOW);
+	digitalWrite(15, LOW);
 
 	// configure W1+W2 LED pins
 	pinMode(14, OUTPUT);
 	pinMode(4, OUTPUT);
+	digitalWrite(14, LOW);
+	digitalWrite(4, LOW);
 
 	// Setup console
 	Serial1.begin(115200);
