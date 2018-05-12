@@ -1,6 +1,9 @@
 // for HSV to RGB
 #include <RGBConverter.h>
 
+// for web server based auto-update
+#include <ESP8266HTTPUpdateServer.h>
+
 // for MQTT subscription
 #include <MQTT.h>
 #include <PubSubClient.h>
@@ -125,6 +128,10 @@ WiFiManagerParameter custom_mqtt_server("server", "MQTT Server (not working)", m
 WiFiManager wifiManager;
 WiFiClient wclient;
 PubSubClient client(wclient, server);
+
+// OTA update
+ESP8266WebServer httpServer(80);
+ESP8266HTTPUpdateServer httpUpdater;
 
 // called when no wifi present
 void wifiConfigCallback(WiFiManager *wifiManager) {
@@ -386,6 +393,8 @@ void setup() {
 		WiFi.hostname().c_str(),
 		WiFi.localIP().toString().c_str());
 
+	httpUpdater.setup(&httpServer);
+	httpServer.begin();
 
 	subscribe();
 
@@ -420,6 +429,8 @@ void loop() {
 		client.loop();
 	else
 		subscribe();
+
+	httpServer.handleClient();
 
 	processSwitch();
 
