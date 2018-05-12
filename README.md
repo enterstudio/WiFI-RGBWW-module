@@ -9,17 +9,15 @@ It provides the following features:
  * Real-time control via MQTT
  * Easy WiFi setup with [WiFiManager](https://github.com/tzapu/WiFiManager)
  * Smooth fading between colors
- * Colorwheel fading with (almost) constant brightness and variable speed
+ * Colorwheel fading with (almost) constant brightness and variable speed, brightness and saturation
  * Direct OpenHAB HSV support
  * PWM of HSV, RGB, W1 and W2 channels based on MQTT topics
  * Exposes on-board LEDs and reboot as MQTT topics
  * Use of the more-robust SDK PWM (see below compilation instructions!)
+ * WiFi OTA update (`http://IP/update`)
  * Correct CIE-1931 brightness mapping
 
 Open tasks / known issues:
- * Piggy-back MQTT server address into WiFiManager dialog
- * Derive `MQTT_ID` from MAC address / hostname to allow multiple independent devices
- * Refactor ugly MQTT client code
  * Rewrite OpenHAB configuration files
  * Add support for infrared remotes
 
@@ -29,6 +27,7 @@ This is a heavily-modified fork of [4ndreas' sketch](https://github.com/4ndreas/
 
 You will need to check out the following libraries into `~/Arduino/libraries/` to build the code:
 
+ * ArduinoJson
  * https://github.com/Imroy/pubsubclient (**not** the PubSubClient suggested by Arduino IDE)
  * https://github.com/ratkins/RGBConverter
  * https://github.com/tzapu/WiFiManager
@@ -46,16 +45,20 @@ However, this variant isn't well tested.
 
 # MQTT Topics
 
-All topics have the same format. Currently, they all begin with `/openHAB/Bedroom_ESP/` and have the individual channel following:
+After connecting to the WiFi network, the H801 will subscribe to all topics
+under `/openHAB/hostname/channel` where the hostname is the hostname of the
+H801 module, e.g. `ESP_F000BA`, and the following channels are supported:
 
+ * `Build` - this will be published when the ESP boots, so you can see the new device without serial
  * `Reset` - publishing this will perform a reboot of the ESP
+ * `Config` - publishing this will perform a reboot of the ESP
  * `RGB` - semicolon-separated triple for the RGB channels with range 0..100, i.e. `100;100;100` for white
  * `HSV` - comma-separated H,S,V values as used by OpenHAB (H: 0..360, S/V: 0..100)
  * `Fader` - color cycling with varying speed, range 0..100. Will be turned off (and re-published) when HSV or RGB are written to
  * `SW1` - W1 output, range 0..100
  * `SW2` - W2 output, range 0..100
- * `LED1` - green on-board LED, range 0..1
- * `LED2` - red on-board LED, range 0..1
+ * `LED1` - green on-board LED, 0 / 100
+ * `LED2` - red on-board LED, 0 / 100
 
 
 # License
