@@ -12,6 +12,11 @@
 #define WIFI_NETWORK "H801-Config"
 #define WIFI_PASSWORD "secret password"
 
+//#define NEOPIXEL 1
+#ifdef NEOPIXEL
+#include <NeoPixelBus.h>
+#endif // NEOPIXEL
+
 // CIE lookup table
 #include "cie1931.h"
 
@@ -178,9 +183,10 @@ void setLEDTarget(int pin, int payload) {
 }
 
 // set taget value in the range 0..100 (for openHAB)
-void setLED100Target(int pin, String payload) {
+int setLED100Target(int pin, String payload) {
 	int val = map(payload.toInt(),0,100,0,cie_RANGE);
 	setLEDTarget(pin, val);
+	return val;
 }
 
 RGBConverter converter;
@@ -232,6 +238,11 @@ void setHSV(float h, float s, float v, bool keep_brightness=false) {
 	setLEDTarget(bluePIN, rgb[2]);
 }
 
+// ******************** NeoPixel ********************
+// 20 pixels, pin is RXD on default DMA method
+#ifdef NEOPIXEL
+NeoPixelBus<NeoGrbFeature,Neo800KbpsMethod> neopixel(20);
+#endif // NEOPIXEL
 
 // process a published MQTT event
 void mqtt_event(const MQTT::Publish& pub) {
@@ -255,9 +266,14 @@ void mqtt_event(const MQTT::Publish& pub) {
 		int c1 = payload.indexOf(';');
 		int c2 = payload.indexOf(';',c1+1);
 
-		setLED100Target(redPIN, payload);
-		setLED100Target(greenPIN, payload.substring(c1+1,c2));
-		setLED100Target(bluePIN, payload.substring(c2+1));
+		int r = setLED100Target(redPIN, payload);
+		int g = setLED100Target(greenPIN, payload.substring(c1+1,c2));
+		int b = setLED100Target(bluePIN, payload.substring(c2+1));
+#ifdef NEOPIXEL
+		Serial1.printf("NeoPixel setting to %d %d %d\n", r, g, b);
+		neopixel.ClearTo(RgbColor(r, g, b));
+		neopixel.Show();
+#endif // NEOPIXEL
 		client.publish(MQTT_PREFIX "Fader", "0");
 	}
 	if(topic_name == "HSV"){
@@ -324,6 +340,13 @@ void setup() {
 	Serial1.begin(115200);
 	delay(10);
 	Serial1.printf("\nESP RGBWW (C) Andreas H, Georg L\n\n");
+
+#ifdef NEOPIXEL
+	// reset pixels to black
+	Serial1.println("Activating NeoPixel support...");
+	neopixel.Begin();
+	neopixel.Show();
+#endif // NEOPIXEL
 
 	// Initialize RGBWW PWM
 #if ESPRESSIF_PWM
