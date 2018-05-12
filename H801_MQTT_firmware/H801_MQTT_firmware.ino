@@ -438,5 +438,5 @@ void loop() {
 		updateLED(i, 1);
 
 	last_tick = t;
-	delay(5);
+	delay(3);
 }
