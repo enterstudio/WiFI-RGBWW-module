@@ -146,7 +146,7 @@ void wifiSaveConfigCallback() {
 
 
 void webServerRoot() {
-	String response = "ESP8266 H801 module\n\nHostname: " + WiFi.hostname() +
+	String response = "ESP8266 H801 module" __DATE__ "\n\nHostname: " + WiFi.hostname() +
 		"\nMQTT server: " + mqtt_server +
 		"\nMQTT: " + mqtt_prefix;
 	httpServer.send(200, "text/plain", response);
@@ -332,6 +332,7 @@ void subscribe() {
 		mqtt_prefix.replace("ZZZhostnameZZZ", WiFi.hostname());
 		client.subscribe(mqtt_prefix + "+");
 		Serial1.printf("MQTT connected to %s: %s\r\n", mqtt_server.c_str(), mqtt_prefix.c_str());
+		client.publish(mqtt_prefix + "Build", __DATE__);
 		LEDoff;
 	}
 }
@@ -409,7 +410,7 @@ void setup() {
 	// Setup console
 	Serial1.begin(115200);
 	while (!Serial1) /* busy loop for serial to attach */;
-	Serial1.printf("\r\nESP RGBWW (C) Andreas H, Georg L\r\n\r\n");
+	Serial1.printf("\r\nESP RGBWW (C) Andreas H, Georg L. " __DATE__ "\r\n\r\n");
 
 #ifdef NEOPIXEL
 	// reset pixels to black
