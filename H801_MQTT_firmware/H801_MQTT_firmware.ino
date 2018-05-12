@@ -23,6 +23,9 @@
 #define D(...) Serial1.printf(__VA_ARGS__)
 #endif
 
+// use "reset" header for external switch
+#define switchPIN 0
+
 // use this for SDK PWM: smoother, less flickering
 #define ESPRESSIF_PWM 1
 
@@ -111,17 +114,27 @@ uint32 io_info[][3] = {
 // TODO: replace with WifiManager option
 IPAddress server(192, 168, 0, 2);
 
+char mqtt_server[64];
+WiFiManagerParameter custom_mqtt_server("server", "MQTT Server (not working)", mqtt_server, 40);
 WiFiManager wifiManager;
 WiFiClient wclient;
 PubSubClient client(wclient, server);
+
+// called when no wifi present
+void wifiConfigCallback(WiFiManager *wifiManager) {
+	LEDon;
+	LED2on;
+	Serial1.println("WiFi configuration mode...");
+	Serial1.printf("Network: %s\nPassword: %s", WIFI_NETWORK, WIFI_PASSWORD);
+}
 
 int fader_speed = 0;		//< speed of the color change effect
 
 int ledIs[PWM_CHANNELS];	//< current brightness for all channels
 int ledTarget[PWM_CHANNELS];	//< target brightness for all channels
 
-int reset_pin = 0;
-int taster_mode = 0;
+int switch_pin_state = 0;
+int switch_active = 0;
 
 void updateLED(int pin, int delta) {
 	int val = ledIs[pin];
@@ -278,18 +291,18 @@ uint32 pwm_duty_init[PWM_CHANNELS] = { 0 };
 
 // perform (re)subscription to MQTT server
 void subscribe() {
+	LEDon;
 	if (client.connect(WiFi.hostname())) {
 		client.subscribe(MQTT_PREFIX "+");
 		Serial1.println("MQTT connected: " MQTT_ID);
 		LEDoff;
-
 	}
 }
 
 void setup() {
 	// configure reset as input
-	pinMode(0, FUNCTION_0);
-	pinMode(0, INPUT_PULLUP);
+	pinMode(switchPIN, FUNCTION_0);
+	pinMode(switchPIN, INPUT_PULLUP);
 
 	// configure green and red LED pins
 	pinMode(LEDPIN, OUTPUT);
@@ -353,6 +366,20 @@ void setup() {
 	last_tick = micros();
 }
 
+void processSwitch() {
+	int pin = digitalRead(switchPIN);
+	if (pin != switch_pin_state) {
+		switch_pin_state = pin;
+		Serial1.printf("\nSwitch pin: %d\n", pin);
+		if (pin == 0) {
+			fader_speed = 0;
+			switch_active = 1 - switch_active;
+			Serial1.printf("\nSwitching light: %d\n", switch_active);
+			client.publish(MQTT_PREFIX "HSV", switch_active ? "0,0,100" : "0,0,0");
+		}
+	}
+
+}
 
 void loop() {
 	// check connectivity, perform MQTT loop
@@ -361,18 +388,7 @@ void loop() {
 	else
 		subscribe();
 
-	int rp = digitalRead(0);
-	if (rp != reset_pin) {
-		reset_pin = rp;
-		Serial1.printf("\nReset pin: %d\n", rp);
-		if (rp == 0) {
-			taster_mode = 255 - taster_mode;
-			Serial1.printf("\nSwitching light: %d\n", taster_mode);
-			setLEDTarget(redPIN, taster_mode);
-			setLEDTarget(greenPIN, taster_mode);
-			setLEDTarget(bluePIN, taster_mode);
-		}
-	}
+	processSwitch();
 
 	unsigned long t = micros();
 	if (fader_speed > 0) {
