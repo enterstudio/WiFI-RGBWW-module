@@ -20,9 +20,7 @@
 // CIE lookup table
 #include "cie1931.h"
 
-#define MQTT_ID "Bedroom_ESP"
-
-#define MQTT_PREFIX "/openHAB/" MQTT_ID "/"
+String mqtt_prefix = "/openHAB/ZZZhostnameZZZ/";
 
 // debug output
 #if 0
@@ -274,7 +272,7 @@ void mqtt_event(const MQTT::Publish& pub) {
 		neopixel.ClearTo(RgbColor(r, g, b));
 		neopixel.Show();
 #endif // NEOPIXEL
-		client.publish(MQTT_PREFIX "Fader", "0");
+		client.publish(mqtt_prefix + "Fader", "0");
 	}
 	if(topic_name == "HSV"){
 		fader_speed = 0;
@@ -282,7 +280,7 @@ void mqtt_event(const MQTT::Publish& pub) {
 		int c2 = payload.indexOf(',',c1+1);
 
 		setHSV(payload.toFloat(), payload.substring(c1+1,c2).toFloat(), payload.substring(c2+1).toFloat(), false);
-		client.publish(MQTT_PREFIX "Fader", "0");
+		client.publish(mqtt_prefix + "Fader", "0");
 
 	}
 	else if(topic_name == "Fader"){
@@ -312,8 +310,9 @@ uint32 pwm_duty_init[PWM_CHANNELS] = { 0 };
 void subscribe() {
 	LEDon;
 	if (client.connect(WiFi.hostname())) {
-		client.subscribe(MQTT_PREFIX "+");
-		Serial1.println("MQTT connected: " MQTT_ID);
+		mqtt_prefix.replace("ZZZhostnameZZZ", WiFi.hostname());
+		client.subscribe(mqtt_prefix + "+");
+		Serial1.printf("MQTT connected: %s\r\n", mqtt_prefix.c_str());
 		LEDoff;
 	}
 }
@@ -413,7 +412,7 @@ void processSwitch() {
 			fader_speed = 0;
 			switch_active = 1 - switch_active;
 			Serial1.printf("\r\nSwitching light: %d\r\n", switch_active);
-			client.publish(MQTT_PREFIX "HSV", switch_active ? "0,0,100" : "0,0,0");
+			client.publish(mqtt_prefix + "HSV", switch_active ? "0,0,100" : "0,0,0");
 		}
 	}
 
