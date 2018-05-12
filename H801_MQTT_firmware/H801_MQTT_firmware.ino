@@ -171,7 +171,6 @@ void updateLED(int pin, int delta) {
 #else
 	analogWrite(pin, val);
 #endif
-	D("V=%d PIN%d=%d\n", ledIs[pin], pin, val);
 }
 
 // set target value in the range 0..cie_RANGE (255) or -cie_RANGE..-1 for inverted LEDs
@@ -227,9 +226,6 @@ void setHSV(float h, float s, float v, bool keep_brightness=false) {
 		colorloopToRgb(h/360, s/100, v/100, rgb);
 	else
 		converter.hsvToRgb(h/360, s/100, v/100, rgb);
-
-	D("H=%03d S=%03d V=%03d --> ", int(_h), int(_s), int(_v));
-	D("R=%03d G=%03d B=%03d\n", rgb[0], rgb[1], rgb[2]);
 
 	setLEDTarget(redPIN, rgb[0]);
 	setLEDTarget(greenPIN, rgb[1]);
