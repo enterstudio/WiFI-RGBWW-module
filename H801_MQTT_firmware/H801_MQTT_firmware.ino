@@ -293,9 +293,16 @@ void mqtt_event(const MQTT::Publish& pub) {
 		client.publish(mqtt_prefix + "Fader", "0");
 	}
 	if(topic_name == "HSV"){
-		fader_speed = 0;
+		if (payload == "ON") {
+			payload = "0,0,100";
+			switch_active = 1;
+		} else if (payload == "OFF") {
+			payload = "0,0,0";
+			switch_active = 0;
+		}
 		int c1 = payload.indexOf(',');
 		int c2 = payload.indexOf(',',c1+1);
+
 
 		setHSV(payload.toFloat(), payload.substring(c1+1,c2).toFloat(), payload.substring(c2+1).toFloat(), false);
 		client.publish(mqtt_prefix + "Fader", "0");
@@ -483,7 +490,7 @@ void processSwitch() {
 			fader_speed = 0;
 			switch_active = 1 - switch_active;
 			Serial1.printf("\r\nSwitching light: %d\r\n", switch_active);
-			client.publish(mqtt_prefix + "HSV", switch_active ? "0,0,100" : "0,0,0");
+			client.publish(mqtt_prefix + "HSV", switch_active ? "ON" : "OFF");
 		}
 	}
 
