@@ -15,6 +15,7 @@ It provides the following features:
  * Exposes on-board LEDs and reboot as MQTT topics
  * Use of the more-robust SDK PWM (see below compilation instructions!)
  * WiFi OTA update (`http://IP/update`)
+ * Supports a physical switch connected to the reset pin (GPIO0)
  * Correct CIE-1931 brightness mapping
 
 Open tasks / known issues:
