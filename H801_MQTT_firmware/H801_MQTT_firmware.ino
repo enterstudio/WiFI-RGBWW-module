@@ -133,7 +133,7 @@ void wifiConfigCallback(WiFiManager *wifiManager) {
 	LEDon;
 	LED2on;
 	Serial1.println("WiFi configuration mode...");
-	Serial1.printf("Network: %s\nPassword: %s", WIFI_NETWORK, WIFI_PASSWORD);
+	Serial1.printf("Network: %s\r\nPassword: %s", WIFI_NETWORK, WIFI_PASSWORD);
 }
 
 int fader_speed = 0;		//< speed of the color change effect
@@ -258,7 +258,7 @@ void mqtt_event(const MQTT::Publish& pub) {
 	String topic_name = pub.topic().substring(lash_slash+1);
 
 	if(topic_name == "Reset"){
-		Serial1.println("Resetting CPU!\n");
+		Serial1.println("Resetting CPU!\r\n");
 		ESP.restart();
 	} else
 	if(topic_name == "RGB"){
@@ -270,7 +270,7 @@ void mqtt_event(const MQTT::Publish& pub) {
 		int g = setLED100Target(greenPIN, payload.substring(c1+1,c2));
 		int b = setLED100Target(bluePIN, payload.substring(c2+1));
 #ifdef NEOPIXEL
-		Serial1.printf("NeoPixel setting to %d %d %d\n", r, g, b);
+		Serial1.printf("NeoPixel setting to %d %d %d\r\n", r, g, b);
 		neopixel.ClearTo(RgbColor(r, g, b));
 		neopixel.Show();
 #endif // NEOPIXEL
@@ -344,7 +344,7 @@ void setup() {
 	// Setup console
 	Serial1.begin(115200);
 	while (!Serial1) /* busy loop for serial to attach */;
-	Serial1.printf("\nESP RGBWW (C) Andreas H, Georg L\n\n");
+	Serial1.printf("\r\nESP RGBWW (C) Andreas H, Georg L\r\n\r\n");
 
 #ifdef NEOPIXEL
 	// reset pixels to black
@@ -356,7 +356,7 @@ void setup() {
 	// Initialize RGBWW PWM
 #if ESPRESSIF_PWM
 	set_pwm_debug_en(0); //disable debug print in pwm driver
-	Serial1.printf("Using SDK PWM version %d with %d channels.\n", get_pwm_version(), PWM_CHANNELS);
+	Serial1.printf("Using SDK PWM version %d with %d channels.\r\n", get_pwm_version(), PWM_CHANNELS);
 
 	pwm_init(1000, pwm_duty_init, PWM_CHANNELS, io_info);
 
@@ -387,7 +387,7 @@ void setup() {
 		delay(250);
 	}
 
-	Serial1.printf("\nWiFi connected: %s (%s)\n",
+	Serial1.printf("\r\nWiFi connected: %s (%s)\r\n",
 		WiFi.hostname().c_str(),
 		WiFi.localIP().toString().c_str());
 
@@ -408,11 +408,11 @@ void processSwitch() {
 	int pin = digitalRead(switchPIN);
 	if (pin != switch_pin_state) {
 		switch_pin_state = pin;
-		Serial1.printf("\nSwitch pin: %d\n", pin);
+		Serial1.printf("\r\nSwitch pin: %d\r\n", pin);
 		if (pin == 0) {
 			fader_speed = 0;
 			switch_active = 1 - switch_active;
-			Serial1.printf("\nSwitching light: %d\n", switch_active);
+			Serial1.printf("\r\nSwitching light: %d\r\n", switch_active);
 			client.publish(MQTT_PREFIX "HSV", switch_active ? "0,0,100" : "0,0,0");
 		}
 	}
