@@ -145,6 +145,13 @@ void wifiSaveConfigCallback() {
 }
 
 
+void webServerRoot() {
+	String response = "ESP8266 H801 module\n\nHostname: " + WiFi.hostname() +
+		"\nMQTT server: " + mqtt_server +
+		"\nMQTT: " + mqtt_prefix;
+	httpServer.send(200, "text/plain", response);
+}
+
 int fader_speed = 0;		//< speed of the color change effect
 
 int ledIs[PWM_CHANNELS];	//< current brightness for all channels
@@ -450,6 +457,7 @@ void setup() {
 		WiFi.localIP().toString().c_str());
 
 	httpUpdater.setup(&httpServer);
+	httpServer.on("/", webServerRoot);
 	httpServer.begin();
 
 	subscribe();
