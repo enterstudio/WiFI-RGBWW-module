@@ -160,11 +160,11 @@ int ledTarget[PWM_CHANNELS];	//< target brightness for all channels
 int switch_pin_state = 0;
 int switch_active = 0;
 
-void updateLED(int pin, int delta) {
+bool updateLED(int pin, int delta) {
 	int val = ledIs[pin];
 	// do nothing if the value has been reached
 	if (ledTarget[pin] == val)
-		return;
+		return false;
 
 	// slowly increment/decrement value towards target
 	if (val+delta < ledTarget[pin])
@@ -181,14 +181,13 @@ void updateLED(int pin, int delta) {
 		val = cie_MAXVAL - cie[-val-1];
 	else
 		val = cie[val];
-
 	// update PWM channel
 #if ESPRESSIF_PWM
 	pwm_set_duty(val, pin);
-	pwm_start();
 #else
 	analogWrite(pin, val);
 #endif
+	return true;
 }
 
 // set target value in the range 0..cie_RANGE (255) or -cie_RANGE..-1 for inverted LEDs
@@ -518,8 +517,13 @@ void loop() {
 	}
 
 	// update all PWM channels
+	bool updated = false;
 	for (int i=0; i < PWM_CHANNELS; i++)
-		updateLED(i, 1);
+		updated |= updateLED(i, 1);
+#if ESPRESSIF_PWM
+	if (updated)
+		pwm_start();
+#endif
 
 	last_tick = t;
 	delay(3);
