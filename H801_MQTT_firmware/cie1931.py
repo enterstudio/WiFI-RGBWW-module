@@ -1,5 +1,5 @@
 INPUT_SIZE = 255       # Input integer size
-OUTPUT_SIZE = 22222    # Output integer size
+OUTPUT_SIZE = 255    # Output integer size
 INT_TYPE = 'const unsigned int'
 TABLE_NAME = 'cie';
 

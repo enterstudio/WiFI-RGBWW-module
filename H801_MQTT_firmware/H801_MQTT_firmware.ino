@@ -18,13 +18,19 @@
 #define WIFI_NETWORK "H801-Config"
 #define WIFI_PASSWORD "secret password"
 
-//#define NEOPIXEL 1
+#define NEOPIXEL 1
 #ifdef NEOPIXEL
 #include <NeoPixelBus.h>
 #endif // NEOPIXEL
 
-// CIE lookup table
+#define LEDon
+#define LEDoff
+#define LED2on
+#define LED2off
+
 #include "cie1931.h"
+
+#define Serial1 Serial
 
 // debug output
 #if 0
@@ -35,90 +41,6 @@
 
 // use "reset" header for external switch
 #define switchPIN 0
-
-// use this for SDK PWM: smoother, less flickering
-#define ESPRESSIF_PWM 1
-
-#if ESPRESSIF_PWM
-extern "C" {
-#include <pwm.h>
-}
-// RGB FET
-#define redPIN    1
-#define greenPIN  2
-#define bluePIN   0
-
-// W FET
-#define w1PIN     3
-#define w2PIN     4
-
-#define PWM_0_OUT_IO_MUX PERIPHS_IO_MUX_MTDI_U
-#define PWM_0_OUT_IO_NUM 12
-#define PWM_0_OUT_IO_FUNC  FUNC_GPIO12
-
-#define PWM_1_OUT_IO_MUX PERIPHS_IO_MUX_MTDO_U
-#define PWM_1_OUT_IO_NUM 15
-#define PWM_1_OUT_IO_FUNC  FUNC_GPIO15
-
-#define PWM_2_OUT_IO_MUX PERIPHS_IO_MUX_MTCK_U
-#define PWM_2_OUT_IO_NUM 13
-#define PWM_2_OUT_IO_FUNC  FUNC_GPIO13
-
-#define PWM_3_OUT_IO_MUX PERIPHS_IO_MUX_MTMS_U
-#define PWM_3_OUT_IO_NUM 14
-#define PWM_3_OUT_IO_FUNC  FUNC_GPIO14
-
-#define PWM_4_OUT_IO_MUX PERIPHS_IO_MUX_GPIO4_U
-#define PWM_4_OUT_IO_NUM 4
-#define PWM_4_OUT_IO_FUNC  FUNC_GPIO4
-
-
-///#define PWM_3_OUT_IO_MUX PERIPHS_IO_MUX_U0TXD_U
-///#define PWM_3_OUT_IO_NUM 1
-///#define PWM_3_OUT_IO_FUNC  FUNC_GPIO1
-///
-///#define PWM_4_OUT_IO_MUX PERIPHS_IO_MUX_GPIO5_U
-///#define PWM_4_OUT_IO_NUM 5
-///#define PWM_4_OUT_IO_FUNC  FUNC_GPIO5
-
-
-uint32 io_info[][3] = {
-	{PWM_0_OUT_IO_MUX,PWM_0_OUT_IO_FUNC,PWM_0_OUT_IO_NUM},
-	{PWM_1_OUT_IO_MUX,PWM_1_OUT_IO_FUNC,PWM_1_OUT_IO_NUM},
-	{PWM_2_OUT_IO_MUX,PWM_2_OUT_IO_FUNC,PWM_2_OUT_IO_NUM},
-	{PWM_3_OUT_IO_MUX,PWM_3_OUT_IO_FUNC,PWM_3_OUT_IO_NUM},
-	{PWM_4_OUT_IO_MUX,PWM_4_OUT_IO_FUNC,PWM_4_OUT_IO_NUM},
-};
-
-#define PWM_CHANNELS	5  //  5:5channel ; 3:3channel
-
-#else // ESPRESSIF_PWM
-
-// RGB FET
-#define redPIN    15
-#define greenPIN  13
-#define bluePIN   12
-
-
-// W FET
-#define w1PIN     14
-#define w2PIN     4
-
-#define PWM_CHANNELS	16
-
-#endif // ESPRESSIF_PWM
-
-// onbaord green LED D1: used for MQTT connection status
-#define LEDPIN    1
-// onbaord red LED D2: used for WiFi status
-#define LED2PIN   5
-
-
-#define LEDoff digitalWrite(LEDPIN,HIGH)
-#define LEDon digitalWrite(LEDPIN,LOW)
-
-#define LED2off digitalWrite(LED2PIN,HIGH)
-#define LED2on digitalWrite(LED2PIN,LOW)
 
 bool config_changed = false;
 String mqtt_server;
@@ -145,20 +67,28 @@ void wifiSaveConfigCallback() {
 }
 
 
-void webServerRoot() {
-	String response = "ESP8266 H801 module" __DATE__ "\n\nHostname: " + WiFi.hostname() +
-		"\nMQTT server: " + mqtt_server +
-		"\nMQTT: " + mqtt_prefix;
-	httpServer.send(200, "text/plain", response);
-}
-
 int fader_speed = 0;		//< speed of the color change effect
 
-int ledIs[PWM_CHANNELS];	//< current brightness for all channels
-int ledTarget[PWM_CHANNELS];	//< target brightness for all channels
+#define CHANNELS 3
+#define redPIN 0
+#define greenPIN 1
+#define bluePIN 2
+
+int ledIs[CHANNELS];		//< current brightness for all channels
+int ledTarget[CHANNELS];	//< target brightness for all channels
 
 int switch_pin_state = 0;
 int switch_active = 0;
+
+void webServerRoot() {
+	String response = "ESP8266 ESP-01 WS2812b module - " __DATE__ "\n\nHostname: " + WiFi.hostname() +
+		"\nMQTT server: " + mqtt_server +
+		"\nMQTT: " + mqtt_prefix +
+		"\n\nFader: " + fader_speed + "\n";
+	for (int i = 0; i < CHANNELS; i++)
+		response += String("\Channel ") + i + ": cur=" + ledIs[i] + " tgt=" + ledTarget[i];
+	httpServer.send(200, "text/plain", response);
+}
 
 bool updateLED(int pin, int delta) {
 	int val = ledIs[pin];
@@ -174,31 +104,18 @@ bool updateLED(int pin, int delta) {
 	else
 		val = ledTarget[pin];
 	ledIs[pin] = val;
-
-	// obtain cie1931 value for brightness
-	// hack: negative values mean inverted LED (0=full brightness, 1=black)
-	if (val < 0)
-		val = cie_MAXVAL - cie[-val-1];
-	else
-		val = cie[val];
-	// update PWM channel
-#if ESPRESSIF_PWM
-	pwm_set_duty(val, pin);
-#else
-	analogWrite(pin, val);
-#endif
 	return true;
 }
 
-// set target value in the range 0..cie_RANGE (255) or -cie_RANGE..-1 for inverted LEDs
+// set target value in the range 0..255
 void setLEDTarget(int pin, int payload) {
-	int val = constrain(payload,-cie_RANGE-1,cie_RANGE);
+	int val = constrain(payload, 0, 255);
 	ledTarget[pin] = val;
 }
 
 // set taget value in the range 0..100 (for openHAB)
 int setLED100Target(int pin, String payload) {
-	int val = map(payload.toInt(),0,100,0,cie_RANGE);
+	int val = map(payload.toInt(), 0, 100, 0, 255);
 	setLEDTarget(pin, val);
 	return val;
 }
@@ -244,15 +161,15 @@ void setHSV(float h, float s, float v, bool keep_brightness=false) {
 	else
 		converter.hsvToRgb(h/360, s/100, v/100, rgb);
 
-	setLEDTarget(redPIN, rgb[0]);
-	setLEDTarget(greenPIN, rgb[1]);
-	setLEDTarget(bluePIN, rgb[2]);
+	setLEDTarget(redPIN, rgb[redPIN]);
+	setLEDTarget(greenPIN, rgb[greenPIN]);
+	setLEDTarget(bluePIN, rgb[bluePIN]);
 }
 
 // ******************** NeoPixel ********************
 // 20 pixels, pin is RXD on default DMA method
 #ifdef NEOPIXEL
-NeoPixelBus<NeoGrbFeature,Neo800KbpsMethod> neopixel(20);
+NeoPixelBus<NeoGrbFeature,NeoEsp8266Uart800KbpsMethod> neopixel(150);
 #endif // NEOPIXEL
 
 // process a published MQTT event
@@ -281,14 +198,9 @@ void mqtt_event(const MQTT::Publish& pub) {
 		int c1 = payload.indexOf(';');
 		int c2 = payload.indexOf(';',c1+1);
 
-		int r = setLED100Target(redPIN, payload);
-		int g = setLED100Target(greenPIN, payload.substring(c1+1,c2));
-		int b = setLED100Target(bluePIN, payload.substring(c2+1));
-#ifdef NEOPIXEL
-		Serial1.printf("NeoPixel setting to %d %d %d\r\n", r, g, b);
-		neopixel.ClearTo(RgbColor(r, g, b));
-		neopixel.Show();
-#endif // NEOPIXEL
+		setLED100Target(redPIN, payload);
+		setLED100Target(greenPIN, payload.substring(c1+1,c2));
+		setLED100Target(bluePIN, payload.substring(c2+1));
 		client.publish(mqtt_prefix + "Fader", "0");
 	}
 	if(topic_name == "HSV"){
@@ -308,27 +220,11 @@ void mqtt_event(const MQTT::Publish& pub) {
 
 	}
 	else if(topic_name == "Fader"){
-		fader_speed = payload.toInt();
-	}
-	else if(topic_name == "SW1"){
-		setLED100Target(w1PIN, payload);
-	}
-	else if(topic_name == "SW2"){
-		setLED100Target(w2PIN, payload);
-	}
-	else if(topic_name == "LED1"){
-		digitalWrite(LEDPIN, 100-payload.toInt());
-	}
-	else if(topic_name == "LED2"){
-		digitalWrite(LED2PIN, 100-payload.toInt());
+		fader_speed = payload.toInt()*10;
 	}
 }
 
-unsigned long last_tick;	//< timestamp of last loop run, for smooth fading
-
-#if ESPRESSIF_PWM
-uint32 pwm_duty_init[PWM_CHANNELS] = { 0 };
-#endif
+unsigned long last_tick, last_shift;	//< timestamp of last loop run, for smooth fading
 
 // perform (re)subscription to MQTT server
 void subscribe() {
@@ -339,6 +235,7 @@ void subscribe() {
 		client.subscribe(mqtt_prefix + "+");
 		Serial1.printf("MQTT connected to %s: %s\r\n", mqtt_server.c_str(), mqtt_prefix.c_str());
 		client.publish(mqtt_prefix + "Build", __DATE__);
+		client.publish(mqtt_prefix + "IP", WiFi.localIP().toString().c_str());
 		LEDoff;
 	}
 }
@@ -375,7 +272,7 @@ void saveConfigIfNeeded() {
 	if (!config_changed)
 		return;
 
-	Serial.println("Saving config.json...");
+	Serial1.println("Saving config.json...");
 	DynamicJsonBuffer jsonBuffer;
 	JsonObject& json = jsonBuffer.createObject();
 	json["mqtt_server"] = mqtt_server;
@@ -395,49 +292,18 @@ void setup() {
 	pinMode(switchPIN, FUNCTION_0);
 	pinMode(switchPIN, INPUT_PULLUP);
 
-	// configure green and red LED pins
-	pinMode(LEDPIN, OUTPUT);
-	pinMode(LED2PIN, OUTPUT);
-
-	// configure RGB LED pins
-	pinMode(12, OUTPUT);
-	pinMode(13, OUTPUT);
-	pinMode(15, OUTPUT);
-	digitalWrite(12, LOW);
-	digitalWrite(13, LOW);
-	digitalWrite(15, LOW);
-
-	// configure W1+W2 LED pins
-	pinMode(14, OUTPUT);
-	pinMode(4, OUTPUT);
-	digitalWrite(14, LOW);
-	digitalWrite(4, LOW);
-
 	// Setup console
 	Serial1.begin(115200);
 	while (!Serial1) /* busy loop for serial to attach */;
-	Serial1.printf("\r\nESP RGBWW (C) Andreas H, Georg L. " __DATE__ "\r\n\r\n");
+	Serial1.printf("\r\nESP RGBWW (C) Andreas H, Georg L. - ESP-01 WS2812b version - " __DATE__ "\r\n\r\n");
 
 #ifdef NEOPIXEL
 	// reset pixels to black
 	Serial1.println("Activating NeoPixel support...");
 	neopixel.Begin();
+	neopixel.ClearTo(RgbColor(0, 0, 0));
 	neopixel.Show();
 #endif // NEOPIXEL
-
-	// Initialize RGBWW PWM
-#if ESPRESSIF_PWM
-	set_pwm_debug_en(0); //disable debug print in pwm driver
-	Serial1.printf("Using SDK PWM version %d with %d channels.\r\n", get_pwm_version(), PWM_CHANNELS);
-
-	pwm_init(1000, pwm_duty_init, PWM_CHANNELS, io_info);
-
-	pwm_start();
-#else
-	Serial1.println("Using flickering horrible Arduino PWM.");
-	analogWriteFreq(1000);
-	analogWriteRange(cie_MAXVAL);
-#endif
 
 	loadConfig();
 
@@ -471,7 +337,7 @@ void setup() {
 
 	saveConfigIfNeeded();
 
-	for (int i=0; i<PWM_CHANNELS; i++) {
+	for (int i=0; i<CHANNELS; i++) {
 		ledIs[i] = 0;
 		ledTarget[i] = 0;
 	}
@@ -514,15 +380,22 @@ void loop() {
 			_h -= 360;
 
 		setHSV(_h, _s, _v, true);
+		for (int i=0; i < CHANNELS; i++)
+			ledIs[i] = ledTarget[i];
 	}
 
 	// update all PWM channels
 	bool updated = false;
-	for (int i=0; i < PWM_CHANNELS; i++)
+	for (int i=0; i < CHANNELS; i++)
 		updated |= updateLED(i, 1);
-#if ESPRESSIF_PWM
-	if (updated)
-		pwm_start();
+
+#if NEOPIXEL
+	if (last_shift < t + 10000) {
+		neopixel.RotateRight(1);
+		neopixel.ClearTo(RgbColor(cie[ledIs[0]], cie[ledIs[1]], cie[ledIs[2]]), 0, 0);
+		neopixel.Show();
+		last_shift = t;
+	}
 #endif
 
 	last_tick = t;
